@@ -1,0 +1,7 @@
+#sc2 spicelib-overview_purpose Purpose of the library #sc2
+
+#par The focus for Spicelib is on general utility modules for AS3
+development. Furthermore Spicelib serves as a support library for the other Spicefactory projects.
+So if you are using Parsley, Pimento or Cinnamon there are always Spicelib modules working
+under the hood. But they are completely independent and can be used without these other higher
+level frameworks (and also do not depend on each other, with a few exceptions). #par

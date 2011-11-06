@@ -1,0 +1,144 @@
+#sc2 commands_data Passing Data to Commands #sc2
+
+#par Often all commands executed in a sequence are self-contained and do not need to know each other.
+But sometimes the result of one command is needed when executing one of the subsequent commands.
+Preferrably this happens without the subsequent command needing any kind of knowledge about
+the type of the command that produced the result or any of its implementation details.
+This section provides an overview over the available options for passing results in a decoupled way. #par
+
+
+
+#sc3 commands_shared_model Using a Shared Model Instance #sc3
+
+#par When the commands executed in a sequence are all relatively close in a sense that they belong 
+to the same functional area of the application, the most straightforward way is often to use 
+a shared application-specific model instance that multiple commands have access to: #par
+
+#cdb
+var #hlt model #hlt:LoginModel = new LoginModel();
+Commands
+    .asSequence()
+    .add(new LoginCommand(#hlt model #hlt))
+    .add(new LoadUserProfileCommand(#hlt model #hlt))
+    .complete(completeHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+#par Here the model gets passed to the constructor of both command instances. The first one can pass
+the result to the model before dispatching the complete event, so that the second instance has access
+to it when it gets executed. #par
+
+#par For objects from the same functional area where decoupling commands from each other is not a concern,
+this might sometimes be the best approach, as it is very easy to use and does not require any help from the framework. #par
+
+
+
+#sc3 commands_pass_results Data Passed by the Framework #sc3
+
+#par When you want to keep commands decoupled in cases where the tasks they perform are largely unrelated,
+you can rely on the framework to pass the results for you. There are multiple different approaches available
+as described below. Note that although this is based on some sort of injection, it does not require an
+IOC container. This section still only describes the capabilities of the standalone Spicelib Commands project. #par
+
+
+
+#sc3 commands_data_constructor Passing Data into the Constructor #sc3
+
+#par Any result from a command that has already been completed as part of a sequence or flow can be
+passed to the constructor of a subsequent command: #par
+
+#cdb
+function MyCommand (user:User, config:XML) {
+    this.user = user;
+    this.config = config;
+}
+#cdb
+
+#par The logic for finding the result to inject is fairly simple: the framework looks for the result by type
+(reflecting on the constructor argument types), and if there is more than one matching type picks the one
+that was added last. This should already cover most real-world requirements. If you need more complex result
+lookup capabilities, you can still do explicit lookups as described further below. #par
+
+#par If no matching result is found, the sequence will abort with an error, unless you marked the parameter
+as optional: #par
+
+#cdb
+function MyCommand (user:User, config:XML = null) {
+#cdb 
+
+#par It should be obvious that constructor injection can only work when you pass the type
+of the command to the #cdi create #cdi method instead of an existing instance, as you need
+to leave it up to the framework to instantiate the command for you in this case: #par
+
+#cdb
+Commands
+    .asSequence()
+    .#hlt create #hlt(LoginCommand)
+    .#hlt create #hlt(LoadUserProfileCommand)
+    .#hlt create #hlt(MyCommand)
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb 
+
+#par It is recommended to only use constructor injection when you target Flash Player 10.1 or newer,
+as older players had a nasty reflection bug that always reported #cdi * #cdi as the parameter type
+when you reflected before the VM created the first instance of that class. #par
+
+
+
+#sc3 commands_data_execute Passing Data to the Execute Method #sc3
+
+#par Alternatively results from preceding commands can also get injected into the execute method: #par
+
+#cdb
+public function execute (user: User, config: XML): void {
+    
+    [...]
+    
+}
+#cdb
+
+#par The rules are the same as for constructor injection: the framework looks for the result by type
+(reflecting on the parameter types), and if there is more than one matching type picks the one
+that was added last. #par
+
+#par Obviously this type of injection also works for existing command instances: #par
+
+#cdb
+Commands
+    .asSequence()
+    .add(LoginCommand)
+    .add(LoadUserProfileCommand)
+    .add(MyCommand)
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb 
+
+
+
+#sc3 commands_data_programmatically Passing Data Programmatically #sc3
+
+#par Sometimes you want to be flexible. You might want to expect a User instance as a parameter
+of the execute method, and in some cases it might come from a preceding login command, while in
+other cases it might already be available. In the latter case you can manually pass data when
+wiring up the commands: #par
+
+#cdb
+var user:User = ...;
+
+Commands
+    .asSequence()
+    .add(LoadUserProfileCommand)
+    .add(MyCommand)
+    .#hlt data(user) #hlt
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb 
+
+#par The outcome is the same as in previous examples where the User instance was produced by a login command.
+The data method in the builder API can be invoked multiple times. #par
+ 

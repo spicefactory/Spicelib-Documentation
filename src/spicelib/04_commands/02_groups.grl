@@ -1,0 +1,151 @@
+#sc2 commands_groups Command Groups #sc2
+
+#par The real power behind the concept of abstracting asynchronous operations becomes apparent when
+you want to execute more than just one command. Spicelib Commands allow for grouping commands
+for parallel or sequential execution. There is also an advanced grouping mode called command flows
+that uses dynamic decision points between commands. See #ref commands_flows #ref for details.
+This chapter only covers sequential and parallel execution. #par
+
+
+
+#sc3 commands_sequences Command Sequences #sc3
+
+#par A simple sequence with 2 commands can be created and executed like this: #par
+
+#cdb
+Commands
+    .asSequence()
+    .add(new LoginCommand())
+    .add(new LoadUserProfileCommand())
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+    
+private function resultHandler (result: UserProfile): void {
+
+    [...]
+    
+}
+
+private function errorHandler (failure: CommandFailure): void {
+    
+    trace("Command " + failure.target + " failed, cause: " + failure.cause);
+    
+}
+#cdb
+
+#par The fluent API allows to declare the commands and handlers of the group and execute it in one statement. #par
+
+#par The error handler always has to accept a parameter of type #cdi CommandFailure #cdi. This is a type that neither
+extends #cdi Error #cdi nor #cdi ErrorEvent #cdi. It allows to inspect the target command in the group that failed
+as well as the cause (usually an instance of type #cdi Error #cdi nor #cdi ErrorEvent #cdi, but potentially something
+else). #par
+
+#par The result handler above is only interested in the last result produced in that sequence. This might be quite common
+for sequences, in particular in cases where the result of previous commands get injected into and processed by subsequent
+commands (see #ref commands_data #ref for details). #par
+
+#par Alternatively all results produced by the sequence may get inspected: #par
+
+#cdb
+Commands
+    .asSequence()
+    .add(new LoadContactsCommand())
+    .add(new LoadUserProfileCommand())
+    .allResults(resultHandler)
+    .execute();
+    
+private function resultHandler (result: CommandData): void {
+
+    trace("Contacts: " + result.getObject(Contacts));
+    trace("Profile: " + result.getObject(UserProfile));
+    
+}
+#cdb
+
+
+#sc3 commands_parallel Parallel Command Execution #sc3
+
+#par Less common than sequences, but still quite handy to have when needed.
+The syntax is identical expect for calling #cdi inParallel #cdi instead of #cdi asSequence #cdi: #par
+
+#cdb
+Commands
+    .inParallel()
+    .add(new LoadContactsCommand())
+    .add(new LoadUserProfileCommand())
+    .allResults(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+#par The rules for result and error handlers are the same as for sequences. #par
+
+
+
+#sc3 commands_groups_lazy Lazy Command Instantiation #sc3
+
+#par Instead of passing existing instances to #cdi add #cdi, you can alternatively just 
+specify the command class. This way the instantiation will be deferred until the command actually gets used.
+This might be useful for flows (where some commands may never get executed) or when you want to pass results
+of preceding commands to the constructor of a subsequent one, which is only possible if the framework creates
+the instance for you. #par
+
+#cdb
+Commands
+    .asSequence()
+    .#hlt create #hlt(LoginCommand)
+    .#hlt create #hlt(LoadUserProfileCommand)
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb 
+
+
+
+#sc3 commands_groups_timeouts Timeouts and Delayed Execution #sc3
+
+#par Command Groups allow for the same set of optional features like the methods for executing a single command: #par
+
+#cdb
+Commands
+    .asSequence()
+    #hlt .delay(1000) #hlt
+    .add(new LoginCommand())
+    .add(new LoadUserProfileCommand())
+    #hlt .timeout(30000) #hlt
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+#par In case of sequences the delay can be placed anywhere in the sequence, before the first or between
+two commands. #par
+
+
+
+#sc3 commands_groups_combine_APIs Combining the APIs for Single and Grouped Commands #sc3
+
+#par Sometimes you may want to use the API for dealing with a single command to define something
+specific to that instance and then add it as part of a sequence or flow. In this case you can simply
+call #cdi build #cdi in the end instead of #cdi execute #cdi, which just gives you a command instance
+with those extra features applied, but without actually executing it. You can then add it to any
+group of commands: #par
+
+#cdb
+var login:Command = Commands
+    .wrap(new LoginCommand())
+    .timeout(30000)
+    .result(someHandlerOnlyForThisCommand)
+    .#hlt build #hlt();
+    
+Commands
+    .asSequence()
+    .add(#hlt login #hlt)
+    .add(new LoadUserProfileCommand())
+    .complete(completeHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+

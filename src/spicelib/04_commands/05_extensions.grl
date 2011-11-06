@@ -1,0 +1,188 @@
+#sc2 commands_extensions Extending the Framework #sc2
+
+
+#par The preceding sections primarily covered the basic functionality of the library. It should be sufficient
+for most real world scenarios. This chapter gives an overview over available extension points. It is only
+relevant if you want to tweak Spicelib Commands to your needs or want to integrate it into another framework
+(like an IOC container for example). #par 
+
+#par The two major extension points are command adapters and the lifecycle hooks. #par
+
+
+
+#sc3 commands_adapter Implementing a Command Adapter #sc3
+
+#par Adapters usually serve one of the following two purposes: #par
+
+#lst
+#lse Allow for the seamless integration of classes from existing APIs (e.g. the Flash or Flex APIs) that do
+not implement one of the Spicelib Command interfaces. #lse
+#lse Allow for the creation of command types that resemble the built-in default command type like demonstrated
+in #ref commands_implementation #ref, but come with additional or tweaked functionality. #lse
+#lst
+
+#par To integrate a new adapter the following steps must be performed: #par
+
+#lst 
+#lse Create an implementation of the #cdi CommandAdapter #cdi interface #lse
+#lse Create an implementation of the #cdi CommandAdapterFactory #cdi interface #lse
+#lse Register the new factory #lse
+#lst
+
+#par The remaining sections explain these steps. #par
+
+
+#sub Implementing the CommandAdapter interface #sub
+
+#par To make your life easier you can extend the #cdi AbstractSuspendableCommand #cdi base class
+that covers some of the basic plumbing and then implement the #cdi CommandAdapter #cdi interface
+on top of it. #par
+
+#par Your adapter then must override the #cdi doExecute #cdi method to execute the target method
+and then invoke the protected #cdi complete #cdi or #cdi error #cdi methods when the target command
+finished its execution. If your adapter supports cancellable or suspendable commands, it is also
+supposed to override the #cdi doCancel #cdi and/or #cdi doSuspend #cdi and #cdi doResume #cdi methods. #par
+
+#par The default command type of the library is itself based on an adapter.
+If you want to study the implementation as an example you can browse the code 
+of the #cdi LightCommandAdapter #cdi class. #par
+
+
+#sub Implementing the CommandAdapterFactory interface #sub
+
+#par This class is responsible to actually create new adapter instances based on an already
+existing target command instance. The interface is simple: #par
+
+#cdb
+public interface CommandAdapterFactory {
+
+    function createAdapter (instance:Object, domain:ApplicationDomain = null) : CommandAdapter;
+    
+}
+#cdb
+
+#par Whenever a command instance that does not already implement one of the Command interfaces
+is added to one of the executors created by the various command builder APIs, the framework
+consults all available command adapter factories to try to turn the command instance into
+an adapter instance. The adapter factories will be executed one after the other until one
+of them returns an adapter (Chain of Responsibility pattern). In case your adapter factory
+does not "recognize" the provided instance it should return null to signal to the framework
+that it should ask the next adapter. If no factory feels responsible for a command instance,
+an error will be thrown. #par
+
+
+#sub Registering a CommandAdapterFactory #sub
+
+#par Finally the factory must be registered with the framework: #par
+
+#cdb
+CommandAdapterFactories
+    .addFactory(new MyFactory())
+    .order(1);
+#cdb
+
+#par The order determines which factory gets asked in which order in case there are 
+multiple factories registered. #par
+
+
+
+#sc3 commands_lifecycle Using the Lifecycle Hooks #sc3 
+
+#par Another extension point provided by the library are the lifecycle hooks. They are particularly
+useful when you want to integrate the Spicelib Commands into a different kind of framework, like
+an IOC container for example. The Parsley framework is using these hooks in version 3 for the
+redesigned command support. But other containers can integrate in the same way. #par
+
+#par For integration into a container, usually the following functionality is desirable: #par
+
+#lst
+#lse Injection of managed objects into the command instances #lse
+#lse Adding the command itself to the container during its execution #lse
+#lst
+
+#par To make this work the #cdi CommandExecutor #cdi interface contains a method
+called prepare that allows to pass customized implementations of the #cdi CommandData #cdi
+and #cdi CommandLifecycle #cdi interfaces down to the executed commands: #par
+
+#cdb
+public interface CommandExecutor extends SuspendableCommand {
+	
+    function prepare (lifecycle:CommandLifecycle, data:CommandData) : void;
+    
+	[...]
+	
+}
+#cdb
+
+#par All built-in executors like those for executing command flows or sequences implement
+this interface. When the prepare method is invoked before executing the flow or sequence
+the specified #cdi CommandLifecycle #cdi and #cdi CommandData #cdi instances will get passed
+down to all individual commands. #par
+
+
+#sub The CommandLifecycle Interface #sub
+
+#par The interface looks like this: #par
+
+#cdb
+public interface CommandLifecycle {
+	
+    function createInstance (type:Class, data:CommandData) : Object;
+	
+    function beforeExecution (command:Object, data:CommandData) : void;
+	
+    function afterCompletion (command:Object, result:CommandResult) : void;
+	
+}
+#cdb
+
+#par It is responsible for creating command instances, and it may execute additional logic
+before and after execution of the command. The #cdi beforeExecution #cdi and #cdi afterExecution #cdi
+methods are the hooks that can be used for adding and removing commands to a container. #par
+
+
+#sub The CommandData Interface #sub
+
+#par Finally the CommandData interface can be used to integrate the simple injection features
+of Spicelib Commands (that allow for injection of results produced by preceding commands)
+with the injection facility of a container. #par
+
+#cdb
+public interface CommandData {
+	
+    function getObject (type:Class = null) : Object;
+ 	
+    function getAllObjects (type:Class = null) : Array;
+ 	
+}
+#cdb
+
+#par These methods will get invoked by the framework when an execute method
+or a command constructor expects a specific type to get injected. Your custom
+#cdi CommandData #cdi implementation will only get invoked when the framework
+cannot find a matching type itself (e.g. from the results of preceding commands).
+This allows for seamless integration. #par
+
+
+#sub Putting it all together #sub
+
+#par Once you have your custom #cdi CommandLifecycle #cdi and #cdi CommandData #cdi
+implementations you may want to create a nice builder API so that your users do not
+need to care about these low-level details. This builder API might be similar to the
+one built into Spicelib. It would allow to create, group and execute commands
+and under the hood it would silently create instances of the lifecylce and data
+implementations and pass them to the #cdi prepare #cdi method of your executor. #par
+
+
+
+
+
+
+
+
+
+
+
+
+
+

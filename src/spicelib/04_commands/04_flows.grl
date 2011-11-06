@@ -1,0 +1,181 @@
+#sc2 commands_flows Command Flows #sc2
+
+#par Command Flows add the concept of decision points to define a dynamic sequence of commands. 
+The command builder API offers several declarative means of defining decision points based on 
+result type, value or property value to cover the most common scenarios as well as a way to add a custom link
+instance in case some other type of decision logic is required. A command link simply determines the next
+command to execute based on the result of the previous command. #par
+
+
+
+#sc3 commands_link_type Linking by Result Type #sc3
+
+#par Let's show a simple example where you want to execute the command to load the admin console of your application
+only when the user that just logged in is indeed an administrator. This example assumes that the instance
+returned from the server is different depending on the role of the user: #par
+
+#cdb
+var profileLoader:Command = new ProfileLoaderCommand("some/serviceUrl");
+
+var flow:CommandFlowBuilder = Commands.asFlow();
+
+flow.add(new LoginCommand())
+    .#hlt linkResultType(AdminUser) #hlt.toCommandType(LoadAdminConsoleCommand)
+    .#hlt linkResultType(User) #hlt.toCommandInstance(profileLoader);
+        
+flow.create(LoadAdminConsoleCommand)
+    .linkAllResults().toCommandInstance(profileLoader);
+    
+flow.timeout(30000)    
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb   
+
+#par We use the #cdi linkResultType #cdi method to branch to different command types based on the type of the result
+produced by the #cdi LoginCommand #cdi. #par
+
+
+
+#sc3 commands_link_value Linking by Result Value #sc3
+
+
+#par You may not always have commands that finish with a different result
+type for all possible outcomes. In these cases you can alternatively link by value and not by class and use
+something like String constants that the commands may set as a result: #par
+
+#cdb
+var profileLoader:Command = new ProfileLoaderCommand("some/serviceUrl");
+
+var flow:CommandFlowBuilder = Commands.asFlow();
+
+flow.add(new LoginCommand())
+    .#hlt linkResultValue(MyConstants.ADMIN_LOGIN) #hlt.toCommandType(LoadAdminConsoleCommand)
+    .#hlt linkResultValue(MyConstants.USER_LOGIN) #hlt.toCommandInstance(profileLoader);
+        
+flow.create(LoadAdminConsoleCommand)
+    .linkAllResults().toCommandInstance(profileLoader);
+    
+flow.add(profileLoader)
+    .linkAllResults().toFlowEnd();
+    
+flow.timeout(30000)    
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+
+
+#sc3 commands_link_property Linking by Result Property #sc3
+
+
+#par If the result type is always the same, but carries a property value that can be used to determine the
+next command, the following syntax can be used: #par
+
+#cdb
+var profileLoader:Command = new ProfileLoaderCommand("some/serviceUrl");
+
+var flow:CommandFlowBuilder = Commands.asFlow();
+
+flow.add(new LoginCommand())
+    .#hlt linkResultProperty("isAdmin", true) #hlt.toCommandType(LoadAdminConsoleCommand)
+    .#hlt linkResultProperty("isAdmin", false) #hlt.toCommandInstance(profileLoader);
+        
+flow.create(LoadAdminConsoleCommand)
+    .linkAllResults().toCommandInstance(profileLoader);
+
+flow.add(profileLoader)
+    .linkAllResults().toFlowEnd();
+       
+flow.timeout(30000)    
+    .lastResult(resultHandler)
+    .error(errorHandler)
+    .execute();
+#cdb
+
+#par Here the login command will always return an instance of #cdi User #cdi, but the #cdi isAdmin #cdi property
+lets us know whether she has the admin role: #par
+
+#cdb
+public class User {
+
+    public var isAdmin: Boolean;
+    
+    [...]
+    
+}
+#cdb
+
+
+
+#sc3 commands_link_end Linking to the End of the Flow #sc3
+
+#par Like already shown in all preceding examples, a link can explicitly point to the end of the flow: #par
+
+#cdb
+flow.add(profileLoader)
+    .linkAllResults().#hlt toFlowEnd() #hlt;
+#cdb
+
+#par Since the default behaviour of a command flow in case no link matches the result is to cancel the flow,
+the end of the flow has to be specified explicitly to reach successful completion of the flow. #par
+
+
+
+#sc3 commands_link_default Specifying Fallback Links #sc3
+
+#par Whenever none of the specified links match it is interpreted as cancellation of the flow.
+Alternatively you can also specify a catch-all link like this: #par
+
+#cdb
+flow.add(new LoginCommand())
+    .linkResultType(AdminUser).toCommandType(LoadAdminConsoleCommand)
+    .linkResultType(User).toCommandInstance(profileLoader);
+    .#hlt linkAllResults #hlt().toCommandType(InitGuestModeCommand);
+#cdb    
+
+#par Here the final link is only processed if the first two links both do not match the results. #par
+
+
+
+#sc3 commands_custom_links Custom Links #sc3
+
+#par The examples above covered a more declarative way of linking commands that should be fine for many
+real world scenarios. Nevertheless sometimes you'd require custom logic. The best way to add a very
+simple condition is an inline function: #par
+
+#cdb
+flow.add(new LoginCommand())
+    .linkFunction(function (result: CommandResult, processor: CommandLinkProcessor): void {
+        if (event.result is User && User(event.result).loginCount < 3) {
+            processor.executeCommand(create(ShowNewUserDashboardCommand));
+        }
+        else {
+        	processor.executeCommand(create(LoadUserProfileCommand));
+        }
+    });
+    
+    private function create (commandType: Class): Command {
+        return Commands.create(commandType).build();
+    }
+#cdb  
+
+#par The signature of the method is the same as for the #cdi link #cdi method in the #cdi CommandLink #cdi
+interface. Instead of specifying the next command to execute you can alternatively trigger the successfull
+completion of the flow, an Error or flow cancellation, using the methods of the #cdi CommandLinkProcessor #cdi instance. #par 
+ 
+#par Finally, if the logic is more complex and it is justified to extract it into a separate class
+you can also use any implementation of the #cdi CommandLink #cdi interface: #par
+
+#cdb
+flow.add(new LoginCommand()).link(new MyCustomLink());
+#cdb
+
+#par The #cdi linkFunction #cdi and #cdi link #cdi methods produce the only type of links that
+even get processed when the preceding command finished with an Error. This way even different     
+error conditions can be linked if required. The other declarative ways of linking like the 
+#cdi linkResultType #cdi or #cdi linkResultProperty #cdi methods are only considered when
+the preceding command completed successfully. #par
+
+

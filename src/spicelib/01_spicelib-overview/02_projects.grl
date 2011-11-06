@@ -1,0 +1,34 @@
+#sc2 spicelib-overview_projects Spicelib Projects #sc2
+
+#par Spicelib consists of the following projects: #par
+
+#sub Reflection #sub
+
+#par The reflection library contains convenient classes to reflect on AS3 classes,
+methods and properties without the need for cumbersome parsing of XML output from 
+#cdi describeType #cdi. It includes convenient mechanism of mapping metadata 
+tags to concrete classes, to overcome the lack of type-safety of
+AS3 metadata. All in all it is a library that should have been part of the core APIs
+of the Flash Player.
+For more information see #ref reflection_intro #ref. #par
+
+#sub XML to Object Mapper #sub
+
+#par A small but powerful and flexibel XML-to-Object Mapper which allows you to map from XML 
+to AS3 classes - in both directions. It comes with builtin mappers
+which cover the most common use cases like mapping properties of AS3 classes to XML attributes
+or child elements, but can be easily extended. For more information see #ref xmlmapper_intro #ref. #par
+
+#sub Command Framework #sub
+
+#par A general abstraction for asynchronous operations. Allows grouping of
+commands for sequential or parallel execution and passing data from command
+results to subsequent commands in a decoupled fashion. For more information see #ref commands_intro #ref. #par
+
+#sub Logging #sub
+
+#par The logging framework allows to log custom messages from application code and use 
+the configuration options to filter log output based on logger names (often corresponding
+to the name of the class containing the log statement) and log levels as a way to indicate
+the severity or importance of the log message. 
+For more information see #ref spicelib-logging_intro #ref. #par 

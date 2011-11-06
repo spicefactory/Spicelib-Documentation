@@ -1,0 +1,14 @@
+#sc1 commands_intro The Command Framework #sc1
+
+#par The Command Framework is a general abstraction for synchronous and asynchronous operations. It aims at simplifying
+and streamlining the creation of asynchronous operations and grouping them for sequential or parallel execution. #par
+
+#par Many operations in Flex and Flash operations are asynchronous, as AS3 is not multithreaded and there are no 
+blocking calls. Most of these operations come with their own APIs and their own particular set of events
+that mark completion or failure of its execution. Chaining several of these operations together usually requires
+a lot of plumbing that distracts from the actual business logic. With Spicelib Commands it is easier to keep
+each operation in a clean self-contained unit and easily chain them together with a convenient, fluent builder API. #par
+
+#par The Commands Framework is a replacement for the Task Framework that was part of Spicelib 1 and 2.
+It is intended to be simpler to use and more powerful at the same time. The Task Framework is discontinued
+and no longer part of Spicelib 3. #par

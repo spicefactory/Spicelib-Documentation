@@ -5,7 +5,7 @@
 	<property name="project.dir" value="${basedir}/.."/>
 	<property name="manual.src.dir" value="${project.dir}/src"/>
 	<property name="manual.target.dir" value="${project.dir}/html"/>
-	<property name="website.parsley.docs.dir" value="${project.dir}/../Website/parsley/docs/${version}"/>
+	<property name="website.parsley.docs.dir" value="${project.dir}/../../SpicefactoryProduction/Website/parsley/docs/${version}"/>
 
 	
 	<target name="generate_html" description="Parsley Manual - HTML Version">

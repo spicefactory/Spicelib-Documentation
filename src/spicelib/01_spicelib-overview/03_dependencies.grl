@@ -1,0 +1,11 @@
+#sc2 spicelib-overview_dependencies Project Dependencies #sc2
+
+#par This table lists the dependencies required for each of the projects.
+The dependencies are always included in the downloads of library releases. #par
+
+#tbl
+#tbr Reflection # spicelib-util #tbr
+#tbr XML to Object Mapper # spicelib-reflect, spicelib-util #tbr
+#tbr Command Framework # spicelib-reflect, spicelib-util #tbr
+#tbr Logging # spicelib-util #tbr
+#tbl

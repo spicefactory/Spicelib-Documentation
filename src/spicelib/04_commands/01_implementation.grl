@@ -1,0 +1,338 @@
+#sc2 commands_implementation Implementing a Command #sc2
+
+#par The implementation of a command follows simple naming conventions. It does not require to extend a framework base class
+or implement a framework interface. There are two major reasons for this design decision. The first is to keep command implementations
+very simple and lightweight and useful even when used without the framework. The second is to keep the method signatures flexible
+to allow to pass data and callbacks to the execute method, as you'll see in the examples. The only downside is a negligible loss in type-safety. #par
+
+#par The style of command implementation shown in this section is just the default. The documentation focuses on this style as it is very
+straightforward and should be sufficient for most use cases. If you are picky about details, prefer to code against interfaces or base classes
+instead, have special requirements or are a framework developer who needs additional functionality you can read #ref commands_extensions #ref
+for an overview over alternatives. #par
+
+
+
+
+#sc3 commands_sync Synchronous Commands #sc3
+
+#par A synchronous command may look as simple as this: #par
+
+#cdb
+public class SimpleCommand {
+
+    public function execute (): void {
+    
+        trace("I execute, Therefore I am");
+        
+    }
+    
+}
+#cdb    
+   
+#par The only naming convention a synchronous command needs to adhere to, is to have a public method called
+execute. It may have parameters (see #ref commands_data_execute #ref) or a return type (see #ref commands_results #ref),
+but both are optional. #par    
+
+
+
+#sc3 commands_async Asynchronous Commands #sc3
+
+
+#par An asynchronous command has to accept a callback function either as a method parameter or a public property.
+It invokes the callback method to signal command completion, #par
+
+
+
+#sub Callback as a Method Parameter #sub
+
+#par Any parameter in the execute method that is of type Function is interpreted as being the callback for an asynchronous
+command. The ordering does not matter, if you also want the framework pass data from previous commands the callback may
+be at any position in the parameter list: #par
+
+#cdb
+public class MyAsyncCommand {
+
+    public function execute (callback: Function): void {
+    
+        callback(true);
+        
+    }
+    
+}
+#cdb  
+
+#par In the example above the actual execution is synchronous, since the callback is invoked immediately. This is legal, as it 
+allows to implement commands with transparent caching for example (if the result is already available, return it immediately, otherwise
+call some service asynchronously). See the next section for an example for such a command. #par
+
+
+#sub Callback as a Public Property #sub
+
+#par When you start an asynchronous operation, you usually want to keep the callback as a reference and invoke it later. You can store it in a property
+manually when receiving it as a method parameter in the execute method, but in most cases it is more convenient to get it injected into a property: #par
+
+#cdb
+public class MyAsyncCommand {
+
+    public var callback:Function;
+
+    public function execute (): void {
+    
+        // rest of the implementation omitted for clarity:
+        
+        var result:Object = getResultFromCache();
+        
+        if (result) {
+            callback(result);
+        }
+        else {
+            getService().fetchData(resultHandler, errorHandler);
+        }        
+    }
+    
+    private function resultHandler (result: Object): void {
+        callback(result);
+    }
+    
+    private function errorHandler (error: ErrorEvent): void {
+        callback(error);
+    }
+    
+}
+#cdb
+
+#par The naming convention requires that the public property is called callback. In the example above the callback gets invoked immediately
+when cached data is available, otherwise the result and error handlers invoke it later. As you see they both just pass the result or error
+instance to the callback, see the next section to understand how the framework interprets these parameters. #par
+
+
+#sub How to Invoke the Callback #sub
+
+#par The callback invocation is interpreted differently depending on whether you pass a parameter and what type it is of. Each asynchronous command
+can have three different final states after execution, and they are interpreted by the callback as follows: #par
+
+#lst
+#lse #str Cancellation #str: Invoking the callback without parameters. #lse
+#lse #str Error #str: Passing an instance of #cdi Error #cdi or #cdi ErrorEvent #cdi to the callback. #lse
+#lse #str Success #str: Passing any other type to the callback which gets interpreted as the result of the command. #lse
+#lst
+
+#par Per default only #cdi Error #cdi or #cdi ErrorEvent #cdi instances are interpreted as an error outcome, but the list
+can be extended with custom error types: #par
+
+#cdb
+LightCommandAdapter.addErrorType(FaultEvent);
+#cdb
+
+#par Here we add the Flex #cdi FaultEvent #cdi as an error type. Since Spicelib Commands is a pure AS3 library it does not know
+about Flex classes. The #cdi LightCommandAdapter #cdi is the class that adapts the type of command demonstrated in this chapter
+to the framework interfaces. #par
+
+#par When the command does not produce a result, it is recommended to simply pass #cdi true #cdi to the callback, as no parameter
+is interpreted as cancellation. #par
+
+#par Invoking the callback with more than one parameter is illegal and leads to an error. A function reference is quite weak
+in terms of type-safety, but it allows to keep the command implementation decoupled from the framework APIs. Later releases
+might alternatively allow the injection of a concrete type (e.g. #cdi CommandCallback #cdi) with a more explicit, typed API. #par 
+
+
+
+#sc3 commands_errors Error Handling #sc3
+
+#par If you want to signal an error condition instead of successful completion you can do that for synchronous and asynchronous
+commands in two different ways: #par
+
+
+#sub Synchronous Commands #sub
+
+#cdb
+public class FaultyCommand {
+
+    public function execute (): void {
+    
+        throw new Error("Sorry, I do not function properly");
+        
+    }
+    
+}
+#cdb  
+
+#par A synchronous command may simply throw an error. If it is executed in a sequence or flow this will lead to 
+the configured error handling and potentially cancel the sequence or flow with an error event. #par
+
+
+#sub Asynchronous Commands #sub
+
+#cdb
+public class FaultyCommand {
+
+    public var callback:Function;
+
+    public function execute (): void {
+    
+        getService().fetchData(resultHandler, errorHandler);
+    }
+    
+    [...]
+    
+    private function errorHandler (error: ErrorEvent): void {
+        callback(error);
+    }
+    
+}
+#cdb  
+
+#par For an asynchronous command an error condition can be signalled by passing a parameter type which is interpreted as an error
+like already shown in the previous section. #par
+
+
+
+#sc3 commands_cancellation Command Cancellation #sc3
+
+#par An asynchronous command can support cancellation. There are two ways to cancel a command: from within by invoking
+the callback without parameters, like already shown in preceding sections, or from the outside when the command has
+a method called #cdi cancel #cdi. #par
+
+
+#sub Cancellation from within the Command #sub
+
+#cdb
+public class MyCancellableCommand {
+
+    public var callback:Function;
+    
+    public function execute (): void {
+    
+        callback(); // invocation without parameters interpreted as cancellation
+        
+    }
+    
+}
+#cdb  
+
+
+#sub Cancellation from the Outside #sub
+
+#cdb
+public class MyCancellableCommand {
+
+    public var callback:Function;
+    
+    public function execute (): void {
+    
+        // start operation
+        
+    }
+    
+    public function cancel (): void {
+    
+        // cancel operation
+        
+    }
+    
+}
+#cdb
+
+#par Here the command adds a method called #cdi cancel #cdi. If the command is part of a sequence or flow which
+gets cancelled, the framework will invoke the #cdi cancel #cdi method so that you can stop whatever asynchronous
+operation you started. When the active command in a sequence does not have a cancel method, the entire sequence
+cannot be cancelled and invocation of its cancel method leads to an error. Still, adding a cancel method is 
+entirely optional. #par
+
+#par When a command gets cancelled from the outside there is no need to invoke the callback to signal cancellation. #par
+
+#par Note that such a cancel method is only meant to be called by the framework. Invoking it directly in your
+application code does not have any effect as the framework cannot intercept these calls. #par
+
+
+
+#sc3 commands_results Producing a Result #sc3
+
+#par Any command (both synchronous and asynchronous) can produce a result. This is particularly useful as the 
+result value can get injected into subsequent commands (either to their constructor or their execute method) and also
+to result handlers you add to command executors (see the next section). #par
+
+
+#sub Synchronous Commands #sub
+
+#par A synchronous command can produce a result through a return value: #par
+
+#cdb
+public class CommandWithResult {
+
+    public function execute (): String {
+    
+        return "Hello World!";
+        
+    }
+    
+}
+#cdb    
+
+#par The result can be of any type. #par
+
+
+#sub Asynchronous Commands #sub
+
+#par An asynchronous command can produce a result through passing a value to the callback function: #par
+
+#cdb
+public class MyAsyncCommand {
+
+    public var callback:Function;
+
+    public function execute (): void {
+    
+        getService().fetchData(resultHandler);
+        
+    }
+    
+    private function resultHandler (result: Object): void {
+        callback(result);
+    }
+    
+}
+#cdb
+
+#par Again, the result can be of any type, except for the few interpreted as an error (like #cdi Error #cdi and #cdi ErrorEvent #cdi). #par
+
+
+
+#sc3 commands_execution Executing a Command #sc3
+
+#par The framework comes with a fluent API to create commands, add result and error handlers, specify timeouts and execute them.
+For a single command this is usually not particularly useful, as you could as well just instantiate and invoke them yourself. But even
+for a single command it allows to wrap features like timeouts around your command without the need to deal with this type of functionality
+in the command implementation. #par
+
+#cdb
+Commands.wrap(new MySimpleCommand())
+    .timeout(10000)
+    .result(resultHandler)
+    .error(errorHandler)
+    .execute();
+
+private function resultHandler (result: Object): void {
+    [...]
+}
+
+private function errorHandler (cause: Object): void {
+    [...]
+}
+#cdb
+
+#par The real power of this API though is grouping commands for sequential or parallel execution or to command flows where
+subsequent commands are determined by dynamic links that interpret the result of the preceding command. You can find examples
+for how to execute these command types in #ref commands_groups #ref and #ref commands_flows #ref. #par
+
+
+
+
+
+
+
+
+
+
+
+
