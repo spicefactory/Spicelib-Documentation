@@ -20,7 +20,7 @@ Commands
     .asSequence()
     .add(new LoginCommand(#hlt model #hlt))
     .add(new LoadUserProfileCommand(#hlt model #hlt))
-    .complete(completeHandler)
+    .lastResult(resultHandler)
     .error(errorHandler)
     .execute();
 #cdb

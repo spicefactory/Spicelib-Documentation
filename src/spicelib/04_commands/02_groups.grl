@@ -143,7 +143,7 @@ Commands
     .asSequence()
     .add(#hlt login #hlt)
     .add(new LoadUserProfileCommand())
-    .complete(completeHandler)
+    .lastResult(resultHandler)
     .error(errorHandler)
     .execute();
 #cdb
