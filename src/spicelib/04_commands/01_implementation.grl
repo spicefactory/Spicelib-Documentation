@@ -39,7 +39,7 @@ but both are optional. #par
 
 
 #par An asynchronous command has to accept a callback function either as a method parameter or a public property.
-It invokes the callback method to signal command completion, #par
+It invokes the callback method to signal command completion. #par
 
 
 

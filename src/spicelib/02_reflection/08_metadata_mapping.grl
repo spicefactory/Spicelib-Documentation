@@ -31,7 +31,7 @@ public class LoginController {
 #cdb
 
 #par Let's assume you are building a framework that will interpret the #cdi EventHandler #cdi tag
-and invoke the annotated method whenever such an Event occurs (in fact Parsley 2 will include
+and invoke the annotated method whenever such an Event occurs (in fact Parsley includes
 metadata-driven configuration options like this). The first step would be to create a class
 that represents this tag: #par
 
