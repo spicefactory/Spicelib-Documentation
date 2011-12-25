@@ -86,6 +86,119 @@ multiple factories registered. #par
 
 
 
+#sc3 commands_resultprocessors Implementing a Result Processor #sc3 
+
+#par A result processor can be registered to process certain types of results.
+This allows to transparently modify or transform these result types without
+the need of the command itself being aware of this kind of processing. #par
+
+#par A result processor itself must be implemented as a command.
+The class can then get registered centrally, causing the framework to create
+a new instance of that result processor command for each matching result
+produced by some other command. #par
+
+#par This section will show the #cdi AsyncToken #cdi support from Parsley as
+an example. The Spicelib Commands library does not know about AsyncTokens as it does
+not depend on the Flex SDK and can be used in pure Flash applications, too. #par
+
+#par A result processor for an AsyncToken works around the fact that the moment
+a command returns an AsyncToken the actual result is not available yet. It removes
+the need for plumbing around Responders inside the command itself, if we move this
+taks to an external result processor. #par
+
+#par The implementation of this processor looks like this: #par
+
+#cdb
+public class AsyncTokenResultProcessor {
+    
+    
+    private var active: Boolean;
+    private var callback: Function;
+    
+    
+    public function execute (token: AsyncToken, callback: Function): void {
+        this.callback = callback;
+        active = true;
+        token.addResponder(new Responder(result, fault));
+    }
+    
+    private function result (event: ResultEvent): void {
+        if (!active) return;
+        callback(event.result);
+        active = false;
+    }
+    
+    private function fault (event: FaultEvent): void {
+        if (!active) return;
+        callback(event.fault);
+        active = false;
+    }
+    
+    public function cancel (): void {
+        active = false;
+    }
+    
+    
+}
+#cdb
+
+#par The AsyncToken produced by any other command will get passed to the execute method
+of this processor. It then adds a responder and waits for either a result or a fault
+to be returned. In both cases the result or the fault are then simply passed to the
+callback. #par
+
+#par To register this processor only one more line of code is needed (must be executed
+before the first command is started): #par
+
+#cdb
+ResultProcessors.forResultType(AsyncToken).processorType(AsyncTokenResultProcessor);
+#cdb
+
+#par In this special case we also must tell the framework that an instance of #cdi Fault #cdi
+signals an error condition (again Spicelib does not depend on the Flex SDK, so it does not
+know about Faults): #par
+
+#cdb
+LightCommandAdapter.addErrorType(Fault);
+#cdb
+
+#par Without this registration, Faults would simply be interpreted as successful results. #par
+
+#par With all these pieces in place, a command based on an AsyncToken can then look as simple as this: #par
+
+#cdb
+public class GetUserListCommand {
+
+	private var service: RemoteObject;
+
+	function GetUserListCommand (service: RemoteObject) {
+	    this.service = service;
+	}
+	
+
+    public function execute (): AsyncToken {
+    
+    	return service.getUserList();
+        
+    }
+    
+}
+#cdb  
+ 
+#par The result processor would kick in as soon as this command returns the AsyncToken and treat
+the result produced of this processor as the final result, not the AsyncToken. #par
+
+#par Note that if you are using Spicelib Commands in Parsley and add the parsley-flex.swc, 
+the result processor shown above will be registered automatically. #par
+
+#par Similarly you could create result processors for #cdi URLLoader #cdi objects or other
+asynchronously executing objects. #par
+
+#par But result processors can also be project-specific, processing or transforming command
+results centrally. #par
+
+
+
 #sc3 commands_lifecycle Using the Lifecycle Hooks #sc3 
 
 #par Another extension point provided by the library are the lifecycle hooks. They are particularly
@@ -106,11 +219,11 @@ and #cdi CommandLifecycle #cdi interfaces down to the executed commands: #par
 
 #cdb
 public interface CommandExecutor extends SuspendableCommand {
-	
+    
     function prepare (lifecycle:CommandLifecycle, data:CommandData) : void;
     
-	[...]
-	
+    [...]
+    
 }
 #cdb
 
@@ -126,13 +239,13 @@ down to all individual commands. #par
 
 #cdb
 public interface CommandLifecycle {
-	
+    
     function createInstance (type:Class, data:CommandData) : Object;
-	
+    
     function beforeExecution (command:Object, data:CommandData) : void;
-	
+    
     function afterCompletion (command:Object, result:CommandResult) : void;
-	
+    
 }
 #cdb
 
@@ -149,11 +262,11 @@ with the injection facility of a container. #par
 
 #cdb
 public interface CommandData {
-	
+    
     function getObject (type:Class = null) : Object;
- 	
+     
     function getAllObjects (type:Class = null) : Array;
- 	
+     
 }
 #cdb
 
