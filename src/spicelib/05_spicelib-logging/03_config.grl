@@ -7,7 +7,7 @@
 
 #par If you are using Parsley anyway, using its XML configuration is probably the most convenient way.
 You can maintain different configuration files for each developer of the project and change it frequently 
-without recompiling. See the Parsley Manual for details. #par
+without recompiling. See #ref logging_flash #ref for details. #par
 
 
 #sc3 spicelib-logging_config_programmatic Programmatic Configuration #sc3
